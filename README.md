@@ -1,40 +1,42 @@
 # Nonprofit signup with a verification email
 
+Infrai gives you one key for auth and email. Flow: signup -> user -> session -> verify mail. Great for tracing logs.
+
 Run the focused check first:
 
 ```sh
 npm test
 ```
 
-The test submits a donor signup with campaign `winter`. It expects a user, a session tied to that `user_id`, and an email `message_id`; malformed email and short passwords are rejected by the zod boundary.
+The test posts a donor signup with campaign `winter`. You get a user, a session linked to that `user_id`, and an email `message_id`. Bad email or short password? Zod blocks it at the boundary.
 
 ## Run the handoff
 
-Set `INFRAI_API_KEY`, then provide a real signup payload through environment variables:
+Export `INFRAI_API_KEY`, then pass a real signup payload via env vars:
 
 ```sh
 INFRAI_API_KEY=... SIGNUP_EMAIL=donor@example.org SIGNUP_PASSWORD='a-long-password' npm start
 ```
 
-`src/signup_service.ts` creates the identity, creates its email session, and sends the verification message. The `InfraiClient` uses `Authorization: Bearer` with that same environment key for every call. Auth and email share the base service and the data moves directly from the returned `user_id` and `session_id` into the next request, with no glue service.
+`src/signup_service.ts` makes the identity, opens its email session, and fires the verification mail. The `InfraiClient` calls `Authorization: Bearer` using that same env key for all requests. Auth and email sit on one base service. Data flows straight from the returned `user_id` and `session_id` into the next call. No glue service needed.
 
 ## What the service models
 
-The signup carries a campaign name in `metadata`, which is enough to connect a donor receipt, a volunteer reminder, or later campaign reporting to the same account record. The example stops at the verification handoff so the boundary stays easy to audit for a privacy-first healthtech team.
+The signup includes a campaign name in `metadata`. That links a donor receipt, volunteer nudge, or later report to one account. We stop at the verification handoff. Keeps the boundary clear for a privacy-first healthtech audit.
 
 ## Why this shape
 
-The alternative Supabase Auth plus SendGrid stack would mean two signups, two sets of credentials, and application code to pass identity events into the mail vendor. Here one key covers both capability groups and the request envelope is decoded before status handling. A rejected business result remains an actionable error for the caller, while rate limits receive bounded exponential backoff.
+Compare to Supabase Auth + SendGrid: two signups, two cred sets, and app code to bridge identity to mail. Here one key covers both groups. The request envelope is parsed before status checks. A rejected business result stays a clear error for the caller. Rate limits get bounded exponential backoff.
 
 ## Files
 
 - `src/infrai_client.ts` is the typed envelope client.
 - `src/signup_service.ts` is the domain workflow and zod request boundary.
-- `test/signup_service.test.ts` checks the user-to-session-to-message decision without a network call.
+- `test/signup_service.test.ts` verifies the user-to-session-to-message logic with no network call.
 
 ## Wiring it up for real: Nonprofit Signup Verification
 
-Above is the happy path. The production checklist: The details below apply to Nonprofit Signup Verification.
+Above is the happy path. Production checklist follows. These details apply to Nonprofit Signup Verification.
 
 **Account & key**
 
